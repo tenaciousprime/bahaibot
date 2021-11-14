@@ -20,6 +20,7 @@ using DSharpPlus.EventArgs;
 using DSharpPlus.Interactivity;
 using DSharpPlus.Interactivity.Enums;
 using DSharpPlus.Interactivity.Extensions;
+using DSharpPlus.SlashCommands;
 using RestSharp;
 using Serilog;
 using Serilog.Extensions.Logging;
@@ -52,7 +53,15 @@ namespace BibleBot.Frontend
                 MinimumLogLevel = Microsoft.Extensions.Logging.LogLevel.Error
             });
 
-            await bot.UseInteractivityAsync();
+            var slashCommandRegistrars = await bot.UseSlashCommandsAsync();
+            await bot.UseInteractivityAsync(new InteractivityConfiguration()
+            {
+                AckPaginationButtons = true,
+                ButtonBehavior = ButtonPaginationBehavior.DeleteButtons,
+                PaginationBehaviour = PaginationBehaviour.Ignore,
+                PaginationDeletion = PaginationDeletion.DeleteEmojis,
+                Timeout = TimeSpan.FromMinutes(2)
+            });
 
             bot.SocketOpened += (s, e) => { Log.Information($"<global> shard {s.ShardId + 1} is connecting"); return Task.CompletedTask; };
             bot.SocketClosed += (s, e) => { Log.Information($"<global> shard {s.ShardId + 1} disconnected"); return Task.CompletedTask; };
@@ -63,6 +72,11 @@ namespace BibleBot.Frontend
             bot.Resumed += (s, e) => { Log.Information($"<global> shard {s.ShardId + 1} resumed"); return Task.CompletedTask; };
 
             bot.MessageCreated += MessageCreatedHandler;
+            foreach (KeyValuePair<int, SlashCommandsExtension> registrar in slashCommandRegistrars)
+            {
+                Log.Information("registering commands");
+                registrar.Value.RegisterCommands<VersionGroupContainer>(362503610006765568);
+            }
 
             bot.GuildCreated += UpdateTopggStats;
             bot.GuildDeleted += UpdateTopggStats;
@@ -139,7 +153,6 @@ namespace BibleBot.Frontend
         {
             _ = Task.Run(async () =>
             {
-                var utils = new Utils();
                 var cli = new RestClient(Environment.GetEnvironmentVariable("ENDPOINT"));
 
                 var acceptablePrefixes = new List<string> { "+", "-", "!", "=", "$", "%", "^", "*", ".", ",", "?", "~", "|" };
@@ -276,7 +289,7 @@ namespace BibleBot.Frontend
                         catch
                         {
                             await e.Channel.SendMessageAsync(
-                                utils.Embedify("+dailyverse set", "I was unable to remove our existing webhooks for this server. I need the **`Manage Webhooks`** permission to manage automatic daily verses.", false)
+                                Utils.Embedify("+dailyverse set", "I was unable to remove our existing webhooks for this server. I need the **`Manage Webhooks`** permission to manage automatic daily verses.", false)
                             );
                         }
                     }
@@ -293,12 +306,12 @@ namespace BibleBot.Frontend
                             request.AddJsonBody(requestObj);
 
                             await cli.PostAsync<CommandResponse>(request);
-                            await e.Channel.SendMessageAsync(utils.Embed2Embed(commandResp.Pages[0]));
+                            await e.Channel.SendMessageAsync(Utils.Embed2Embed(commandResp.Pages[0]));
                         }
                         catch
                         {
                             await e.Channel.SendMessageAsync(
-                                utils.Embedify("+dailyverse set", "I was unable to create a webhook for this channel. I need the **`Manage Webhooks`** permission to enable automatic daily verses.", false)
+                                Utils.Embedify("+dailyverse set", "I was unable to create a webhook for this channel. I need the **`Manage Webhooks`** permission to enable automatic daily verses.", false)
                             );
                         }
                     }
@@ -325,7 +338,7 @@ namespace BibleBot.Frontend
                             {
                                 properPages.Add(new Page
                                 {
-                                    Embed = utils.Embed2Embed(page)
+                                    Embed = Utils.Embed2Embed(page)
                                 });
                             }
 
@@ -333,7 +346,7 @@ namespace BibleBot.Frontend
                         }
                         else
                         {
-                            await e.Channel.SendMessageAsync(utils.Embed2Embed(commandResp.Pages[0]));
+                            await e.Channel.SendMessageAsync(Utils.Embed2Embed(commandResp.Pages[0]));
                         }
                     }
                 }
@@ -360,7 +373,7 @@ namespace BibleBot.Frontend
                             {
                                 properPages.Add(new Page
                                 {
-                                    Embed = utils.Embedify(referenceTitle, verse.Title, verse.Text, false, null)
+                                    Embed = Utils.Embedify(referenceTitle, verse.Title, verse.Text, false, null)
                                 });
                             }
                             else if (verseResp.DisplayStyle == "code")
@@ -390,7 +403,7 @@ namespace BibleBot.Frontend
 
                             if (verseResp.DisplayStyle == "embed")
                             {
-                                var embed = utils.Embedify(referenceTitle, verse.Title, verse.Text, false, null);
+                                var embed = Utils.Embedify(referenceTitle, verse.Title, verse.Text, false, null);
                                 await e.Channel.SendMessageAsync(embed);
                             }
                             else if (verseResp.DisplayStyle == "code")
@@ -411,7 +424,7 @@ namespace BibleBot.Frontend
 
                         if (verseResp.DisplayStyle == "embed")
                         {
-                            var embed = utils.Embedify(referenceTitle, verse.Title, verse.Text, false, null);
+                            var embed = Utils.Embedify(referenceTitle, verse.Title, verse.Text, false, null);
                             await e.Channel.SendMessageAsync(embed);
                         }
                         else if (verseResp.DisplayStyle == "code")
@@ -426,7 +439,7 @@ namespace BibleBot.Frontend
                     }
                     else if (verseResp.LogStatement.Contains("does not support the"))
                     {
-                        await e.Channel.SendMessageAsync(utils.Embedify("Verse Error", verseResp.LogStatement, true));
+                        await e.Channel.SendMessageAsync(Utils.Embedify("Verse Error", verseResp.LogStatement, true));
                     }
                 }
             });
